@@ -1,9 +1,11 @@
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Shell;
 using System.Windows.Threading;
 using Forms = System.Windows.Forms;
+using Point = System.Windows.Point;
 using MessageBox = System.Windows.MessageBox;
 using SnapEdge.App.Services;
 
@@ -14,13 +16,26 @@ public partial class SettingsWindow : Window
     private readonly AppSettings _settings;
     private readonly SettingsService _settingsService;
     private readonly Action _refreshFloatingButton;
+    private const int WmNcHitTest = 0x0084;
+    private const int HtMaxButton = 9;
+
     private readonly DispatcherTimer _saveTimer;
     private bool _initializing = true;
 
     public SettingsWindow(AppSettings settings, SettingsService settingsService, Action refreshFloatingButton)
     {
         InitializeComponent();
-        SourceInitialized += (_, _) => ApplyDarkTitleBar();
+        // Register before WindowChrome so this hook can expose HTMAXBUTTON for Snap Layouts.
+        SourceInitialized += OnSourceInitialized;
+        WindowChrome.SetWindowChrome(this, new WindowChrome
+        {
+            CaptionHeight = 46,
+            ResizeBorderThickness = new Thickness(6),
+            CornerRadius = new CornerRadius(12),
+            GlassFrameThickness = new Thickness(0),
+            UseAeroCaptionButtons = false,
+        });
+        StateChanged += OnWindowStateChanged;
         Loaded += (_, _) => SettingsScrollViewer.ScrollToTop();
         _settings = settings;
         _settingsService = settingsService;
@@ -32,16 +47,59 @@ public partial class SettingsWindow : Window
         Closed += (_, _) => _ = SaveNowAsync();
     }
 
-    private void ApplyDarkTitleBar()
+    private void OnSourceInitialized(object? sender, EventArgs e)
     {
-        var handle = new WindowInteropHelper(this).Handle;
-        var enabled = 1;
-        if (DwmSetWindowAttribute(handle, 20, ref enabled, sizeof(int)) != 0)
-            _ = DwmSetWindowAttribute(handle, 19, ref enabled, sizeof(int));
+        if (PresentationSource.FromVisual(this) is HwndSource source)
+            source.AddHook(OnWindowMessage);
     }
 
-    [DllImport("dwmapi.dll", EntryPoint = "DwmSetWindowAttribute")]
-    private static extern int DwmSetWindowAttribute(nint windowHandle, int attribute, ref int value, int valueSize);
+    private IntPtr OnWindowMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message != WmNcHitTest || !MaximizeRestoreButton.IsVisible ||
+            MaximizeRestoreButton.ActualWidth <= 0 || MaximizeRestoreButton.ActualHeight <= 0)
+            return IntPtr.Zero;
+
+        var packedCoordinates = lParam.ToInt64();
+        var screenPoint = new Point(
+            unchecked((short)(packedCoordinates & 0xFFFF)),
+            unchecked((short)((packedCoordinates >> 16) & 0xFFFF)));
+        var windowPoint = PointFromScreen(screenPoint);
+        var buttonOrigin = MaximizeRestoreButton.TranslatePoint(new Point(), this);
+        var buttonBounds = new Rect(buttonOrigin, MaximizeRestoreButton.RenderSize);
+        if (!buttonBounds.Contains(windowPoint))
+            return IntPtr.Zero;
+
+        handled = true;
+        return new IntPtr(HtMaxButton);
+    }
+
+    private void OnSystemMenuClick(object sender, RoutedEventArgs e)
+    {
+        var button = (FrameworkElement)sender;
+        SystemCommands.ShowSystemMenu(this, button.PointToScreen(new Point(0, button.ActualHeight)));
+    }
+
+    private void OnMinimizeClick(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void OnMaximizeRestoreClick(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void OnCloseClick(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    private void OnWindowStateChanged(object? sender, EventArgs e)
+    {
+        MaximizeGlyph.Data = Geometry.Parse(WindowState == WindowState.Maximized
+            ? "M 6,2 H 13 V 9 M 3,5 H 10 V 12 H 3 Z"
+            : "M 3,3 H 13 V 13 H 3 Z");
+    }
 
     private void LoadSettingsIntoControls()
     {

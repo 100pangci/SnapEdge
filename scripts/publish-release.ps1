@@ -37,11 +37,11 @@ try {
     & $dotnetExe publish $projectPath `
         --configuration Release `
         --runtime win-x64 `
-        --self-contained true `
+        --self-contained false `
         --output $temporaryPublishDirectory `
         --verbosity minimal `
         -p:PublishSingleFile=true `
-        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:IncludeNativeLibrariesForSelfExtract=false `
         -p:PublishTrimmed=false `
         -p:DebugType=None `
         -p:DebugSymbols=false `

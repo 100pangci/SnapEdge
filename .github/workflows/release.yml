@@ -24,7 +24,7 @@ jobs:
       - name: Run tests
         run: dotnet test SnapEdge.sln --configuration Release
 
-      - name: Publish self-contained single-file executable
+      - name: Publish framework-dependent single-file executable
         shell: pwsh
         run: .\scripts\publish-release.ps1
 
