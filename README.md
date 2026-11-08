@@ -51,7 +51,7 @@ dotnet test SnapEdge.sln -c Release
 .\scripts\publish-release.ps1
 ```
 
-输出位于 `artifacts\release\SnapEdge.exe`。发布不内置 .NET 运行时，首次运行需要安装 [.NET 10 Windows Desktop Runtime x64](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)；单文件启用托管程序集压缩并移除调试符号，不启用裁剪。
+输出位于 `artifacts\release\SnapEdge.exe`。发布不内置 .NET 运行时，首次运行需要安装 [.NET 10 Windows Desktop Runtime x64](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)；发布会移除调试符号，不启用裁剪。
 
 GitHub Actions 会在分支推送和 Pull Request 上运行 Windows 构建与测试。推送 `v*` 版本标签（例如 `v1.0.0`）会再次运行测试、生成单文件 EXE 并创建 GitHub Release；标签包含连字符时会标记为预发布版。发布示例：`git tag v1.0.0`，然后 `git push origin v1.0.0`。
 

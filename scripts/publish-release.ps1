@@ -44,8 +44,7 @@ try {
         -p:IncludeNativeLibrariesForSelfExtract=false `
         -p:PublishTrimmed=false `
         -p:DebugType=None `
-        -p:DebugSymbols=false `
-        -p:EnableCompressionInSingleFile=true
+        -p:DebugSymbols=false
 
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed with exit code $LASTEXITCODE."
