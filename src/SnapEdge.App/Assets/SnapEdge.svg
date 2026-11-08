@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#172731" />
+      <stop offset="1" stop-color="#0b141b" />
+    </linearGradient>
+    <linearGradient id="camera" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#20343d" />
+      <stop offset="1" stop-color="#14232b" />
+    </linearGradient>
+    <radialGradient id="lens" cx="36%" cy="30%" r="78%">
+      <stop offset="0" stop-color="#294b50" />
+      <stop offset="1" stop-color="#0c171e" />
+    </radialGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="57" fill="url(#tile)" stroke="#29444b" stroke-width="4" />
+  <path d="M69 80h23l10-19c2-5 7-8 13-8h29c6 0 11 3 14 8l10 19h19c11 0 17 7 17 17v74c0 11-6 17-17 17H69c-11 0-17-6-17-17V97c0-10 6-17 17-17Z"
+        fill="url(#camera)" stroke="#75d6c2" stroke-width="9" stroke-linejoin="round" />
+  <circle cx="128" cy="134" r="34" fill="url(#lens)" stroke="#91e6d5" stroke-width="8" />
+  <circle cx="128" cy="134" r="12" fill="#75d6c2" />
+  <circle cx="124" cy="130" r="4" fill="#e4fff8" />
+  <circle cx="178" cy="101" r="5" fill="#c3fff1" />
+  <path d="M224 103v57" fill="none" stroke="#75d6c2" stroke-width="5" stroke-linecap="round" opacity=".85" />
+</svg>

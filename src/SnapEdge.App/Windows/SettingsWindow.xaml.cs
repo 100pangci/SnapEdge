@@ -1,5 +1,7 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 using MessageBox = System.Windows.MessageBox;
@@ -18,6 +20,8 @@ public partial class SettingsWindow : Window
     public SettingsWindow(AppSettings settings, SettingsService settingsService, Action refreshFloatingButton)
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => ApplyDarkTitleBar();
+        Loaded += (_, _) => SettingsScrollViewer.ScrollToTop();
         _settings = settings;
         _settingsService = settingsService;
         _refreshFloatingButton = refreshFloatingButton;
@@ -27,6 +31,17 @@ public partial class SettingsWindow : Window
         _initializing = false;
         Closed += (_, _) => _ = SaveNowAsync();
     }
+
+    private void ApplyDarkTitleBar()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        var enabled = 1;
+        if (DwmSetWindowAttribute(handle, 20, ref enabled, sizeof(int)) != 0)
+            _ = DwmSetWindowAttribute(handle, 19, ref enabled, sizeof(int));
+    }
+
+    [DllImport("dwmapi.dll", EntryPoint = "DwmSetWindowAttribute")]
+    private static extern int DwmSetWindowAttribute(nint windowHandle, int attribute, ref int value, int valueSize);
 
     private void LoadSettingsIntoControls()
     {
