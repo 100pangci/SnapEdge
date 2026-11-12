@@ -10,6 +10,8 @@ internal static class NativeMethods
     internal const int WsExNoActivate = 0x08000000;
     internal static readonly nint HwndTopmost = new(-1);
     internal const uint WmMouseActivate = 0x0021;
+    internal const uint WmDisplayChange = 0x007E;
+    internal const uint WmDpiChanged = 0x02E0;
     internal const int MaNoActivate = 3;
     internal const uint SwpNoSize = 0x0001;
     internal const uint SwpNoMove = 0x0002;

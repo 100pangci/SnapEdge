@@ -18,6 +18,7 @@ public partial class FloatingButtonWindow : Window
     private readonly DispatcherTimer _longPressTimer;
     private readonly DispatcherTimer _autoHideTimer;
     private readonly DispatcherTimer _topmostTimer;
+    private readonly DispatcherTimer _displayChangeTimer;
     private nint _hWnd;
     private NativeMethods.NativePoint _pressScreenPoint;
     private NativeMethods.NativeRect _pressWindowRect;
@@ -57,6 +58,11 @@ public partial class FloatingButtonWindow : Window
             Interval = TimeSpan.FromMilliseconds(750),
         };
         _topmostTimer.Tick += (_, _) => EnsureTopmost();
+        _displayChangeTimer = new DispatcherTimer(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(250),
+        };
+        _displayChangeTimer.Tick += OnDisplayChangeTimerTick;
         SourceInitialized += OnSourceInitialized;
         Loaded += (_, _) =>
         {
@@ -65,8 +71,8 @@ public partial class FloatingButtonWindow : Window
             _topmostTimer.Start();
             RevealAndRestartAutoHide();
         };
-        Unloaded += (_, _) => _topmostTimer.Stop();
-        Closed += (_, _) => _topmostTimer.Stop();
+        Unloaded += (_, _) => StopTimers();
+        Closed += (_, _) => StopTimers();
         Activated += (_, _) => EnsureTopmost();
         Deactivated += (_, _) => EnsureTopmost();
         IsVisibleChanged += (_, e) =>
@@ -114,6 +120,9 @@ public partial class FloatingButtonWindow : Window
 
         NativeMethods.SetWindowPos(_hWnd, NativeMethods.HwndTopmost, 0, 0, 0, 0,
             NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate | NativeMethods.SwpNoOwnerZOrder);
+
+        if (!_pressed && !_dragging && IsFullyOffScreen())
+            RepositionForDisplayChange();
     }
 
     private nint WindowProc(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
@@ -123,7 +132,65 @@ public partial class FloatingButtonWindow : Window
             handled = true;
             return NativeMethods.MaNoActivate;
         }
+        if (message == NativeMethods.WmDisplayChange || message == NativeMethods.WmDpiChanged)
+        {
+            // WPF and the monitor layout settle after these messages; reflow shortly afterwards.
+            _displayChangeTimer.Stop();
+            _displayChangeTimer.Start();
+        }
         return 0;
+    }
+
+    private void OnDisplayChangeTimerTick(object? sender, EventArgs e)
+    {
+        _displayChangeTimer.Stop();
+        if (!RepositionForDisplayChange())
+            _displayChangeTimer.Start();
+    }
+
+    private bool RepositionForDisplayChange()
+    {
+        if (_hWnd == 0 || !IsLoaded || !NativeMethods.IsWindow(_hWnd))
+            return true;
+        if (_pressed || _dragging)
+            return false;
+        if (!NativeMethods.GetWindowRect(_hWnd, out var current))
+            return true;
+
+        StopSnapAnimation();
+        var monitor = MonitorService.FindByDeviceName(_settings.MonitorDeviceName)
+            ?? MonitorService.GetPrimaryOrFirst();
+        if (monitor is null)
+            return true;
+
+        var (x, y) = GetStoredPosition(current, monitor);
+        NativeMethods.SetWindowPos(_hWnd, NativeMethods.HwndTopmost, x, y, 0, 0,
+            NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow);
+
+        if (_isTucked)
+            MoveToDockedPosition(tuck: true, animate: false);
+        else if (_settings.AutoPeek && _settings.AutoSnap && IsLoaded && !_pressed)
+            _autoHideTimer.Start();
+        return true;
+    }
+
+    private bool IsFullyOffScreen()
+    {
+        if (!NativeMethods.GetWindowRect(_hWnd, out var rect))
+            return false;
+        foreach (var monitor in MonitorService.Enumerate())
+        {
+            if (rect.Left < monitor.Bounds.Right && rect.Right > monitor.Bounds.Left
+                && rect.Top < monitor.Bounds.Bottom && rect.Bottom > monitor.Bounds.Top)
+                return false;
+        }
+        return true;
+    }
+
+    private void StopTimers()
+    {
+        _topmostTimer.Stop();
+        _displayChangeTimer.Stop();
     }
 
     private void OnMouseLeftDown(object sender, MouseButtonEventArgs e)
@@ -367,6 +434,12 @@ public partial class FloatingButtonWindow : Window
         var monitor = MonitorService.FindByDeviceName(_settings.MonitorDeviceName) ?? MonitorService.GetPrimaryOrFirst();
         if (monitor is null)
             return;
+        var (x, y) = GetStoredPosition(current, monitor);
+        NativeMethods.SetWindowPos(_hWnd, 0, x, y, 0, 0, NativeMethods.SwpNoSize | NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow);
+    }
+
+    private (int X, int Y) GetStoredPosition(NativeMethods.NativeRect current, MonitorDetails monitor)
+    {
         var work = monitor.WorkArea;
         var x = _settings.AutoSnap
             ? string.Equals(_settings.SnapSide, "Left", StringComparison.OrdinalIgnoreCase) ? work.Left : work.Right - current.Width
@@ -374,7 +447,7 @@ public partial class FloatingButtonWindow : Window
         var y = work.Top + (int)((work.Height - current.Height) * _settings.VerticalPositionFraction);
         x = Math.Clamp(x, work.Left, Math.Max(work.Left, work.Right - current.Width));
         y = Math.Clamp(y, work.Top, Math.Max(work.Top, work.Bottom - current.Height));
-        NativeMethods.SetWindowPos(_hWnd, 0, x, y, 0, 0, NativeMethods.SwpNoSize | NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow);
+        return (x, y);
     }
 
     private void AnimateSnap(NativeMethods.NativeRect current, int targetX, int targetY)
